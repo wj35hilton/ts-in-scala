@@ -7,7 +7,7 @@ import scala.util.parsing.input.{NoPosition, Position, Reader}
 case class DictionaryParserError(msg: String)
 
 case class ColumnDefinition(
-  size: Int,
+  column: Int,
   columnType: String,
   columnName: String,
   formatLen: Int,
@@ -44,12 +44,12 @@ object DictionaryParser extends Parsers {
     accept("quoted", { case q @ QUOTED(_) => q })
   }
 
-  def size: Parser[Integer] = {
+  def column: Parser[Integer] = {
     OPEN_PAREN ~ integer ~ CLOSE_PAREN ^^ {case _ ~ size ~ _ => size.n}
   }
 
   def columnDef: Parser[ColumnDefinition] = {
-    COLUMN_DES_KW ~ size ~ identifier ~ identifier ~ format ~ quoted ^^  { case _ ~ size ~ columnType ~ columnName ~ format ~ desc => ColumnDefinition(size, columnType.str, columnName.str, format.length, format.spec, desc.str)}
+    COLUMN_DES_KW ~ column ~ identifier ~ identifier ~ format ~ quoted ^^  { case _ ~ column ~ columnType ~ columnName ~ format ~ desc => ColumnDefinition(column - 1, columnType.str, columnName.str, format.length, format.spec, desc.str)}
   }
 
   def dictionary: Parser[DataDictionary] = {

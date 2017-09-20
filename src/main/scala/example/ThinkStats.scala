@@ -1,9 +1,10 @@
 package example
 
-import example.lexer.DictionaryLexer
-import example.lexer.DictionaryToken
-
-import example.parser.{DataDictionary, DictionaryParser}
+import example.lexer.{DictionaryLexer, DictionaryToken}
+import example.parser.{ColumnDefinition, DataDictionary, DictionaryParser}
+import java.io.{FileInputStream}
+import java.util.zip.{GZIPInputStream}
+import scala.io.Source
 import scala.util.parsing.combinator._
 
 object TestDictParser {
@@ -15,19 +16,52 @@ infile dictionary {
 }
 """
 
-  def doSomeStuffWithDict(dict: DataDictionary): Integer = {
-    println(dict)
+  def using[A <: { def close(): Unit }, B](resource: A)(f: A => B): B =
+    try {
+      f(resource)
+    } finally {
+      resource.close()
+    }
 
-   11
+  def extractColumn(huh: String, columnDef: ColumnDefinition): String = {
+    val start = columnDef.column
+    val end = columnDef.formatLen
+    val name = columnDef.columnName
+    s"$name: ${huh.drop(start).take(end)}"
+  }
+
+  def parseLine(huh: String, dict: DataDictionary): List[String] =
+    dict.columnDefs.map(cd => extractColumn(huh, cd))
+
+  def doSomeStuffWithDict(fileName: String, dict: DataDictionary): Seq[Seq[String]] = {
+    using(Source.fromInputStream(new GZIPInputStream(new FileInputStream(fileName)))) {
+      source => {
+        val ls = source.getLines.toList
+        for {
+          l <- ls
+        } yield {
+          parseLine(l, dict)
+        }
+      }
+    }
   }
 
   def main(args: Array[String]) = {
+    using(Source.fromFile("/Users/whilton/work/praxis/ts-in-scala/data/2002FemPreg.dct")) {
+      schemaSource => {
+        val schema = schemaSource.getLines.mkString
 
-    def res = for {
-      ts <- DictionaryLexer(testString)
-      dd <- DictionaryParser(ts)
-      s = doSomeStuffWithDict(dd)
-    } yield(s)
-    println("RES: " + res)
+        def res2 = for {
+          ts <- DictionaryLexer(schema)
+          dd <- DictionaryParser(ts)
+          s = doSomeStuffWithDict("/Users/whilton/work/praxis/ts-in-scala/data/2002FemPreg.dat.gz", dd)
+        } yield(s)
+
+        res2 match {
+          case Left(msg) => println("MSG: " + msg)
+          case Right(recs) => println("RECS: " + recs.head)
+        }
+      }
+    }
   }
 }
